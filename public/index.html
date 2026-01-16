@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>WordCloud Control</title>
+
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #020617;
+            --primary: #38bdf8;
+            --primary-hover: #0ea5e9;
+            --text: #e5e7eb;
+            --muted: #94a3b8;
+            --danger: #ef4444;
+            --radius: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100svh;
+            background: radial-gradient(1200px 600px at top, #020617, var(--bg));
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 500px;
+            /* 稍微放寬以容納更多按鈕 */
+            background: linear-gradient(180deg, #020617, var(--panel));
+            border-radius: var(--radius);
+            padding: 24px 16px;
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 22px;
+            margin: 0 0 6px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        header p {
+            margin: 0;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 0 0 20px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--danger);
+            transition: background 0.3s ease;
+        }
+
+        .dot.online {
+            background: #22c55e;
+        }
+
+        /* 網格佈局優化：手機版每排 3 個，平板以上每排 4 個 */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-height: 60vh;
+            /* 避免手機螢幕過長，增加捲軸 */
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        /* 自定義捲軸樣式 */
+        .grid::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .grid::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+
+        button {
+            appearance: none;
+            border: none;
+            border-radius: 10px;
+            padding: 14px 4px;
+            font-size: 15px;
+            font-weight: 600;
+            background: linear-gradient(180deg, var(--primary), var(--primary-hover));
+            color: #020617;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(14, 165, 233, 0.2);
+            transition: transform 0.08s ease, box-shadow 0.08s ease;
+            white-space: nowrap;
+        }
+
+        button:active {
+            transform: translateY(2px) scale(0.95);
+            box-shadow: 0 2px 5px rgba(14, 165, 233, 0.15);
+        }
+
+        footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        @media (min-width: 400px) {
+            .grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            button {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <header>
+            <h1>主標題</h1>
+            <p>點選你想送出的祝福</p>
+        </header>
+
+        <div class="status">
+            <div id="dot" class="dot"></div>
+            <span id="statusText">連線中…</span>
+        </div>
+
+        <div id="buttonGrid" class="grid">
+        </div>
+        <button id="adminBtn" style="margin-top:12px;background:linear-gradient(180deg,#ef4444,#dc2626);color:white;"
+            onclick="resetVotes()">
+            重新開始
+        </button>
+
+        <footer>
+            即時同步至現場畫面
+        </footer>
+    </div>
+
+    <script>
+const WS_URL = "wss://wordcloud-iiul.onrender.com";
+const words = [
+    "aaa", "bbb", "ccc", "ddd", "eee", "fff", "ggg", "hhh",
+    "iii", "jjj"
+];
+
+const dot = document.getElementById("dot");
+const statusText = document.getElementById("statusText");
+const grid = document.getElementById("buttonGrid");
+
+let socket;
+
+// 1. 初始化連線
+function connectWS() {
+    socket = new WebSocket(WS_URL);
+
+    socket.onopen = () => {
+        dot.classList.add("online");
+        statusText.innerText = "已連線";
+        console.log("WebSocket Connected");
+    };
+
+    socket.onclose = () => {
+        dot.classList.remove("online");
+        statusText.innerText = "連線已中斷，嘗試重連...";
+        setTimeout(connectWS, 3000); // 3秒後自動重連
+    };
+
+    socket.onerror = (err) => {
+        console.error("WebSocket Error:", err);
+    };
+
+    // 接收來自伺服器的訊息 (例如別人重置了票數)
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === "reset") {
+            alert("管理員已重置所有票數");
+        }
+    };
+}
+
+// 2. 動態渲染按鈕
+function renderButtons() {
+    grid.innerHTML = words.map((word, index) =>
+        `<button onclick="sendVote(${index})">${word}</button>`
+    ).join('');
+}
+
+// 3. 傳送投票數據
+function sendVote(index) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        const payload = {
+            type: "vote",
+            index: index
+        };
+        socket.send(JSON.stringify(payload));
+        
+        // 觸發震動回饋 (手機端效果佳)
+        if (navigator.vibrate) navigator.vibrate(50);
+    } else {
+        alert("尚未連線，請檢查網路");
+    }
+}
+
+// 4. 管理員功能：重置
+function resetVotes() {
+    if (confirm("確定要清空所有人的票數嗎？")) {
+        socket.send(JSON.stringify({ type: "reset" }));
+    }
+}
+
+// 初始化執行
+renderButtons();
+connectWS();
+
+
+    </script>
+</body>
+
+</html>
