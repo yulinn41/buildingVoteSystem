@@ -12,9 +12,12 @@ const wss = new WebSocket.Server({ server });
 let unityStatus = "Disconnected";
 let unitySocket = null;
 
+let globalVotes = new Array(10).fill(0);
+
+
 wss.on("connection", (ws) => {
   console.log("新客戶端已連接");
-  
+
   // 傳送當前 Unity 連線狀態給新加入的手機端
   ws.send(JSON.stringify({ type: "system", status: unityStatus }));
 
@@ -33,17 +36,32 @@ wss.on("connection", (ws) => {
         unitySocket = ws;
         broadcastToClients({ type: "system", status: unityStatus });
         console.log("✅ Unity 客戶端已認證");
+
+        ws.send(JSON.stringify({
+          type: "sync",
+          counts: globalVotes
+        }));
+
         return;
       }
 
       // 2. 處理 JSON 格式的指令 (投票或重置)
       const data = JSON.parse(msgString);
-      
-      if (data.type === "vote" || data.type === "reset") {
+
+      if (data.type === "vote") {
+
+        const index = data.index;
+        if (index >= 0 && index < globalVotes.length) {
+          globalVotes[index]++;
+        }
         console.log(`收到指令: ${data.type}, Index: ${data.index ?? 'N/A'}`);
-        
+
         // 廣播給包含 Unity 在內的所有人
-        broadcastToClients(data);
+        broadcastToClients({ type: "sync", counts: globalVotes });
+      }
+      else if (data.type === "reset") {
+        globalVotes.fill(0);
+        broadcastToClients({ type: "sync", counts: globalVotes });
       }
     } catch (e) {
       // 忽略非 JSON 的心跳或錯誤格式
