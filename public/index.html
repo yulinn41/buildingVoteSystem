@@ -23,6 +23,12 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        html,
+        body {
+            /* 禁止雙擊縮放，但保留手勢撥動縮放 */
+            touch-action: manipulation;
+        }
+
         body {
             margin: 0;
             min-height: 100svh;
@@ -171,80 +177,80 @@
     </div>
 
     <script>
-const WS_URL = "wss://buildingvotesystem.onrender.com";
-const words = [
-    "aaa", "bbb", "ccc", "ddd", "eee", "fff", "ggg", "hhh",
-    "iii", "jjj"
-];
+        const WS_URL = "wss://buildingvotesystem.onrender.com";
+        const words = [
+            "aaa", "bbb", "ccc", "ddd", "eee", "fff", "ggg", "hhh",
+            "iii", "jjj"
+        ];
 
-const dot = document.getElementById("dot");
-const statusText = document.getElementById("statusText");
-const grid = document.getElementById("buttonGrid");
+        const dot = document.getElementById("dot");
+        const statusText = document.getElementById("statusText");
+        const grid = document.getElementById("buttonGrid");
 
-let socket;
+        let socket;
 
-// 1. 初始化連線
-function connectWS() {
-    socket = new WebSocket(WS_URL);
+        // 1. 初始化連線
+        function connectWS() {
+            socket = new WebSocket(WS_URL);
 
-    socket.onopen = () => {
-        dot.classList.add("online");
-        statusText.innerText = "已連線";
-        console.log("WebSocket Connected");
-    };
+            socket.onopen = () => {
+                dot.classList.add("online");
+                statusText.innerText = "已連線";
+                console.log("WebSocket Connected");
+            };
 
-    socket.onclose = () => {
-        dot.classList.remove("online");
-        statusText.innerText = "連線已中斷，嘗試重連...";
-        setTimeout(connectWS, 3000); // 3秒後自動重連
-    };
+            socket.onclose = () => {
+                dot.classList.remove("online");
+                statusText.innerText = "連線已中斷，嘗試重連...";
+                setTimeout(connectWS, 3000); // 3秒後自動重連
+            };
 
-    socket.onerror = (err) => {
-        console.error("WebSocket Error:", err);
-    };
+            socket.onerror = (err) => {
+                console.error("WebSocket Error:", err);
+            };
 
-    // 接收來自伺服器的訊息 (例如別人重置了票數)
-    socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === "reset") {
-            alert("管理員已重置所有票數");
+            // 接收來自伺服器的訊息 (例如別人重置了票數)
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === "reset") {
+                    alert("管理員已重置所有票數");
+                }
+            };
         }
-    };
-}
 
-// 2. 動態渲染按鈕
-function renderButtons() {
-    grid.innerHTML = words.map((word, index) =>
-        `<button onclick="sendVote(${index})">${word}</button>`
-    ).join('');
-}
+        // 2. 動態渲染按鈕
+        function renderButtons() {
+            grid.innerHTML = words.map((word, index) =>
+                `<button onclick="sendVote(${index})">${word}</button>`
+            ).join('');
+        }
 
-// 3. 傳送投票數據
-function sendVote(index) {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-        const payload = {
-            type: "vote",
-            index: index
-        };
-        socket.send(JSON.stringify(payload));
-        
-        // 觸發震動回饋 (手機端效果佳)
-        if (navigator.vibrate) navigator.vibrate(50);
-    } else {
-        alert("尚未連線，請檢查網路");
-    }
-}
+        // 3. 傳送投票數據
+        function sendVote(index) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                const payload = {
+                    type: "vote",
+                    index: index
+                };
+                socket.send(JSON.stringify(payload));
 
-// 4. 管理員功能：重置
-function resetVotes() {
-    if (confirm("確定要清空所有人的票數嗎？")) {
-        socket.send(JSON.stringify({ type: "reset" }));
-    }
-}
+                // 觸發震動回饋 (手機端效果佳)
+                if (navigator.vibrate) navigator.vibrate(50);
+            } else {
+                alert("尚未連線，請檢查網路");
+            }
+        }
 
-// 初始化執行
-renderButtons();
-connectWS();
+        // 4. 管理員功能：重置
+        function resetVotes() {
+            if (confirm("確定要清空所有人的票數嗎？")) {
+                socket.send(JSON.stringify({ type: "reset" }));
+            }
+        }
+
+        // 初始化執行
+        renderButtons();
+        connectWS();
 
 
     </script>
