@@ -14,7 +14,7 @@ let unitySocket = null;
 
 let globalVotes = new Array(10).fill(0);
 
-
+let serverTotalCount = 0;
 wss.on("connection", (ws) => {
   console.log("新客戶端已連接");
 
@@ -55,7 +55,8 @@ wss.on("connection", (ws) => {
           globalVotes[index]++;
         }
         console.log(`收到指令: ${data.type}, Index: ${data.index ?? 'N/A'}`);
-
+serverTotalCount++;
+    console.log(`[Server] 累計票數: ${serverTotalCount}`);
         // 廣播給包含 Unity 在內的所有人
         broadcastToClients({ type: "sync", counts: globalVotes });
       }
