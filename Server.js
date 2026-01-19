@@ -55,13 +55,14 @@ wss.on("connection", (ws) => {
           globalVotes[index]++;
         }
         console.log(`收到指令: ${data.type}, Index: ${data.index ?? 'N/A'}`);
-serverTotalCount++;
-    console.log(`[Server] 累計票數: ${serverTotalCount}`);
+        serverTotalCount++;
+        console.log(`[Server] 累計票數: ${serverTotalCount}`);
         // 廣播給包含 Unity 在內的所有人
         broadcastToClients({ type: "sync", counts: globalVotes });
       }
       else if (data.type === "reset") {
         globalVotes.fill(0);
+        serverTotalCount = 0; // 🚩 加入這行，讓 Log 變數也重置
         broadcastToClients({ type: "reset", counts: globalVotes });
       }
     } catch (e) {
