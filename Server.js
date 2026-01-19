@@ -61,7 +61,7 @@ wss.on("connection", (ws) => {
       }
       else if (data.type === "reset") {
         globalVotes.fill(0);
-        broadcastToClients({ type: "sync", counts: globalVotes });
+        broadcastToClients({ type: "reset", counts: globalVotes });
       }
     } catch (e) {
       // 忽略非 JSON 的心跳或錯誤格式
